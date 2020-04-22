@@ -15,7 +15,7 @@
 
 #include <lz4.h>
 
-#include "include/server/server.h"
+#include "server.h"
 
 int getConnection(char *addr, int port)
 {
@@ -23,21 +23,21 @@ int getConnection(char *addr, int port)
     struct sockaddr_in serv_addr;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Socket creation error \n"); 
-        return -1; 
-    } 
-   
-    serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(port); 
-    
+        printf("\n Socket creation error \n");
+        return -1;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
     if(inet_pton(AF_INET, addr, &serv_addr.sin_addr) <= 0) {
-        printf("\nInvalid address/ Address not supported \n"); 
-        return -1; 
-    } 
-   
+        printf("\nInvalid address/ Address not supported \n");
+        return -1;
+    }
+
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\nConnection Failed \n"); 
-        return -1; 
+        printf("\nConnection Failed \n");
+        return -1;
     }
 
 	return sock;
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 	compression_info *compInfo;
 	int compressedSize;
 	char *image;
-	
+
 	if (argc != 3 || (port = atoi(argv[2])) <= 0) {
 		printf("usage: %s <ip> <port>\n", argv[0]);
 	}
@@ -117,4 +117,4 @@ int main(int argc, char *argv[])
 		LZ4_decompress_safe(compInfo->compressed_data, image, compressedSize, compInfo->original_size);
 	}
     return 0;
-} 
+}
