@@ -109,17 +109,31 @@ int process_img(xwindow_info *xwin, compression_info *cmpr) {
         return (-1);
     }
 
-    int cmpr_size = LZ4_compress_default(img->data, cmpr->compressed_data + 4, // M
+	uint32_t *data = malloc(cmpr->original_size);
+	if (data == NULL) {
+		perror("malloc");
+		return (-1);
+	}
+
+	int	k = 0;
+	for (int y = 0; y < img->height; ++y) {
+		for (int x = 0; x < img->width; ++x) {
+			data[k] = XGetPixel(img, x, y);
+			k++;
+		}
+	}
+
+    int cmpr_size = LZ4_compress_default((char *)data, cmpr->compressed_data + 4, // M
                                          cmpr->original_size,
                                          cmpr->max_compressed_size);
 
-    // debug
     if (cmpr_size > 0) {
         printf("We successfully compressed some data! Ratio: %.2f\n",
             (float) cmpr_size / cmpr->original_size);
     }
     printf("%d\n", cmpr_size);
 
+	free(data);
     XDestroyImage(img);
     return (cmpr_size);
 }
