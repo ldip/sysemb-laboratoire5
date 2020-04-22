@@ -11,12 +11,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-/* X11 Header -lX11 */
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xmd.h> 
-#include <X11/Xatom.h>
-
 /* Compression Header */
 #include <lz4.h>
 
