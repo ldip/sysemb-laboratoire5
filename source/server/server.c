@@ -74,6 +74,7 @@ int frame_init(frame_info *frame, Display *dis, Screen *scr, Drawable *drw) {
     frame->width = img->width;
     frame->height = img->height;
     frame->pixel_size = img->bits_per_pixel / 8;
+    frame->scrHeight = scr->height;
 
     XDestroyImage(img);
     return (0);
@@ -124,7 +125,7 @@ int send_cmpr_img(int sock, int cmpr_size, char *cmpr_data) {
 
 int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
     XImage *img = XGetImage(xwin->dis, xwin->drw, 0, 0, xwin->scr->width,
-                            xwin->scr->height, 0, ZPixmap);
+                            xwin->scr->height, AllPlanes, ZPixmap);
 
     if (img == NULL) {
         fprintf(stderr, "XGetImage: fail to retrieve screen image\n");
@@ -137,7 +138,7 @@ int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
 	int				cmpr_size;
 
 	LZ4_initStream(&lz4_stream, sizeof(LZ4_stream_t));
-	for (int y = 0; y < xwin->scr->height; ++y) {
+    for (int y = 0; y < xwin->scr->height; ++y) {
 		line_buf[line_buf_idx] = img->data + (cmpr->block_size * y);
 
 		cmpr_size = LZ4_compress_fast_continue(&lz4_stream, line_buf[line_buf_idx],
@@ -145,8 +146,9 @@ int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
 											   cmpr->block_size,
 											   cmpr->max_compressed_size,
 											   1);
+        printf("Cmpr size %d\n", cmpr_size);
 
-		printf("Ratio: %.2f\n", (float) (cmpr->block_size / cmpr_size));
+		//printf("Ratio: %.2f\n", (float) (cmpr->block_size / cmpr_size));
 
         send_cmpr_img(sock, cmpr_size, cmpr->compressed_data);
 
@@ -154,6 +156,9 @@ int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
 	}
 
     XDestroyImage(img);
+    char tmp;
+    read(sock, &tmp, 1);
+    printf("Une frame recu\n");
 	return (0);
 }
 
