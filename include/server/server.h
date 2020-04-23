@@ -13,6 +13,12 @@ typedef struct  compression_info_t {
     char        *compressed_data;
 }               compression_info;
 
+typedef struct  stream_cmpr_info_t {
+    int         block_size;
+    int         max_compressed_size;
+    char        *compressed_data;
+}               stream_cmpr_info;
+
 /* src_size is width * height * pixel_size */
 typedef struct  frame_info_t {
     int         width;
