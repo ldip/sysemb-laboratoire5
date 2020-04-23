@@ -88,6 +88,7 @@ int xwindow_init(xwindow_info *xwin) {
     return (0);
 }
 
+/*
 int compression_init(compression_info *info, frame_info const *frame) {
     info->original_size = frame->width * frame->height * frame->pixel_size;
     info->max_compressed_size = LZ4_compressBound(info->original_size);
@@ -99,47 +100,17 @@ int compression_init(compression_info *info, frame_info const *frame) {
     }
     return (0);
 }
+*/
 
-int process_img(xwindow_info *xwin, compression_info *cmpr) {
-    XImage *img = XGetImage(xwin->dis, xwin->drw, 0, 0, xwin->scr->width,
-                            xwin->scr->height, AllPlanes, ZPixmap);
+int	stream_compression_init(stream_cmpr_info *info, frame_info const *frame) {
+	info->block_size = frame->width * frame->pixel_size;
+    info->max_compressed_size = LZ4_COMPRESSBOUND(info->block_size);
+    info->compressed_data = malloc((size_t)info->max_compressed_size + 4);
 
-    if (img == NULL) {
-        fprintf(stderr, "XGetImage: fail to retrieve screen image\n");
+    if (info->compressed_data == NULL) {
+        perror("malloc");
         return (-1);
     }
-
-	uint32_t *data = malloc(cmpr->original_size);
-	if (data == NULL) {
-		perror("malloc");
-		return (-1);
-	}
-
-	int	k = 0;
-	for (int y = 0; y < img->height; ++y) {
-		for (int x = 0; x < img->width; ++x) {
-			data[k] = XGetPixel(img, x, y);
-			k++;
-		}
-	}
-
-    int cmpr_size = LZ4_compress_default((char *)data, cmpr->compressed_data + 4, // M
-                                         cmpr->original_size,
-                                         cmpr->max_compressed_size);
-
-    if (cmpr_size > 0) {
-        printf("We successfully compressed some data! Ratio: %.2f\n",
-            (float) cmpr_size / cmpr->original_size);
-    }
-    printf("%d\n", cmpr_size);
-
-	free(data);
-    XDestroyImage(img);
-    return (cmpr_size);
-}
-
-int connection_init(int sock, frame_info *frame_i) {
-    write(sock, frame_i, sizeof(frame_i));
     return (0);
 }
 
@@ -148,6 +119,46 @@ int send_cmpr_img(int sock, int cmpr_size, char *cmpr_data) {
 
     data[0] = cmpr_size;
     write(sock, cmpr_data, cmpr_size + 4);
+    return (0);
+}
+
+int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
+    XImage *img = XGetImage(xwin->dis, xwin->drw, 0, 0, xwin->scr->width,
+                            xwin->scr->height, 0, ZPixmap);
+
+    if (img == NULL) {
+        fprintf(stderr, "XGetImage: fail to retrieve screen image\n");
+        return (-1);
+    }
+
+	LZ4_stream_t	lz4_stream;
+	char			*line_buf[2];
+	int				line_buf_idx = 0;
+	int				cmpr_size;
+
+	LZ4_initStream(&lz4_stream, sizeof(LZ4_stream_t));
+	for (int y = 0; y < xwin->scr->height; ++y) {
+		line_buf[line_buf_idx] = img->data + (cmpr->block_size * y);
+
+		cmpr_size = LZ4_compress_fast_continue(&lz4_stream, line_buf[line_buf_idx],
+											   cmpr->compressed_data + 4,
+											   cmpr->block_size,
+											   cmpr->max_compressed_size,
+											   1);
+
+		printf("Ratio: %.2f\n", (float) (cmpr->block_size / cmpr_size));
+
+        send_cmpr_img(sock, cmpr_size, cmpr->compressed_data);
+
+		line_buf_idx = (line_buf_idx + 1) % 2;
+	}
+
+    XDestroyImage(img);
+	return (0);
+}
+
+int connection_init(int sock, frame_info *frame_i) {
+    write(sock, frame_i, sizeof(frame_info));
     return (0);
 }
 
@@ -182,18 +193,15 @@ int main(int ac, char **av) {
     }
 
     xwindow_info        xwin_i;
-    compression_info    compression_i;
-    int                 cmpr_size = 0;
+    stream_cmpr_info    compression_i;
 
     if (xwindow_init(&xwin_i) == -1 ||
-        compression_init(&compression_i, &xwin_i.frame_i) == -1)
+        stream_compression_init(&compression_i, &xwin_i.frame_i) == -1)
         return (-1);
 
     connection_init(cli_sock, &xwin_i.frame_i);
-    while (1) {
-        cmpr_size = process_img(&xwin_i, &compression_i);
-        send_cmpr_img(cli_sock, cmpr_size, compression_i.compressed_data);
-    }
+    while (1)
+		compress_stream(&xwin_i, &compression_i, cli_sock);
 
     XCloseDisplay(xwin_i.dis);
     close(cli_sock);
