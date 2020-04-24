@@ -6,6 +6,9 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+/* Time Hader */
+#include <sys/time.h>
+
 /* Network Header */
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -16,6 +19,14 @@
 
 /* Local Header */
 #include "server.h"
+
+double get_time_micro()
+{
+	struct timeval  tv;
+	gettimeofday(&tv, NULL);
+
+    return tv.tv_usec;
+}
 
 int set_nonblock(int fd) {
     int flags = fcntl(fd, F_GETFL);
@@ -104,7 +115,7 @@ int compression_init(compression_info *info, frame_info const *frame) {
 */
 
 int	stream_compression_init(stream_cmpr_info *info, frame_info const *frame) {
-	info->block_size = frame->width * frame->pixel_size;
+	info->block_size = frame->width * frame->pixel_size * 90;
     info->max_compressed_size = LZ4_COMPRESSBOUND(info->block_size);
     info->compressed_data = malloc((size_t)info->max_compressed_size + 4);
 
@@ -119,7 +130,11 @@ int send_cmpr_img(int sock, int cmpr_size, char *cmpr_data) {
     int *data = (int *)cmpr_data;
 
     data[0] = cmpr_size;
-    write(sock, cmpr_data, cmpr_size + 4);
+    int tmp = write(sock, cmpr_data, cmpr_size + 4);
+    if (tmp != cmpr_size + 4) {
+        printf("G raison\n");
+        exit(1);
+    }
     return (0);
 }
 
@@ -132,13 +147,16 @@ int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
         return (-1);
     }
 
+    double now = get_time_micro();
+    write(sock, &now, sizeof(double));
+
 	LZ4_stream_t	lz4_stream;
 	char			*line_buf[2];
 	int				line_buf_idx = 0;
 	int				cmpr_size;
 
 	LZ4_initStream(&lz4_stream, sizeof(LZ4_stream_t));
-    for (int y = 0; y < xwin->scr->height; ++y) {
+    for (int y = 0; y < xwin->scr->height / 90; ++y) {
 		line_buf[line_buf_idx] = img->data + (cmpr->block_size * y);
 
 		cmpr_size = LZ4_compress_fast_continue(&lz4_stream, line_buf[line_buf_idx],
@@ -146,7 +164,7 @@ int	compress_stream(xwindow_info *xwin, stream_cmpr_info *cmpr, int sock) {
 											   cmpr->block_size,
 											   cmpr->max_compressed_size,
 											   1);
-        printf("Cmpr size %d\n", cmpr_size);
+        //printf("Cmpr size %d\n", cmpr_size);
 
 		//printf("Ratio: %.2f\n", (float) (cmpr->block_size / cmpr_size));
 

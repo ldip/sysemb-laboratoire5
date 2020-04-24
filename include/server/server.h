@@ -24,6 +24,7 @@ typedef struct  frame_info_t {
     int         width;
     int         height;
     int         pixel_size;
+    int         scrHeight;
 }               frame_info;
 
 typedef struct  xwindow_info_t {
