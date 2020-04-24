@@ -1,5 +1,5 @@
-#include "client/client.h"
-#include "server/common.h"
+#include "client.h"
+#include "common.h"
 
 #include <sys/time.h>
 
@@ -45,7 +45,7 @@ int getConnection(char *addr, int port)
 	return sock;
 }
 
-void display(framebuffer_info *fb, char *image, frame_info *frameInfo, double timeServer)
+void display(framebuffer_info *fb, char *image, double timeServer)
 {
 	static int currentPage = 0;
 	static double time = 0;
@@ -160,8 +160,7 @@ double readData(int sock, stream_cmpr_info *compInfo, char *image, int srcHeight
 
 		decPtr[decBufIndex] = image + (compInfo->block_size * y);
 
-		const int decBytes = LZ4_decompress_safe_continue(
-                lz4StreamDecode, compInfo->compressed_data, decPtr[decBufIndex], size, compInfo->block_size);
+		LZ4_decompress_safe_continue(lz4StreamDecode, compInfo->compressed_data, decPtr[decBufIndex], size, compInfo->block_size);
 
 		decBufIndex = (decBufIndex + 1) % 2;
 	}
@@ -177,7 +176,6 @@ int main(int argc, char *argv[])
 	framebuffer_info *fb;
 	frame_info *frameInfo;
 	stream_cmpr_info *compInfo;
-	int compressedSize;
 	char *image;
 	double timeServer;
 
@@ -193,7 +191,7 @@ int main(int argc, char *argv[])
 
 	while (1) {
 		timeServer = readData(sock, compInfo, image, frameInfo->scrHeight);
-		display(fb, image, frameInfo, timeServer);
+		display(fb, image, timeServer);
 	}
   return 0;
 }
