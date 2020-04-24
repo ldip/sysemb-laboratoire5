@@ -181,6 +181,7 @@ int main(int argc, char *argv[])
 
 	if (argc != 3 || (port = atoi(argv[2])) <= 0) {
 		printf("usage: %s <ip> <port>\n", argv[0]);
+		return 1;
 	}
 
 	sock = getConnection(argv[1], port);
